@@ -10,10 +10,14 @@
 #define HEIGHT WIDTH
 
 #define CELL_SIZE    25
-#define SIMUL_PERIOD 150
+#define SIMUL_PERIOD 50
+
+#define MAX_GRID_SIZE 1000
 
 static SDL_Window *window     = NULL;
 static SDL_Renderer *renderer = NULL;
+
+static unsigned char *cells = NULL, *back_cells = NULL;
 
 static void
 eprintln (const char *fmt, ...)
@@ -26,8 +30,29 @@ eprintln (const char *fmt, ...)
 }
 
 static void
-sdl_cleanup (void)
+set_padding (int realwidth, int realheight, int width, int height, int *lpad,
+             int *tpad)
 {
+  if (realwidth > width)
+    *lpad = (realwidth - width - 1) / 2;
+  else
+    *lpad = 0;
+
+  if (realheight > height)
+    *tpad = (realheight - height - 1) / 2;
+  else
+    *tpad = 0;
+}
+
+static void
+cleanup (void)
+{
+  if (cells != NULL)
+    free (cells);
+
+  if (back_cells != NULL)
+    free (back_cells);
+
   if (renderer)
     SDL_DestroyRenderer (renderer);
 
@@ -38,7 +63,6 @@ sdl_cleanup (void)
 int
 main (int argc, char *argv[])
 {
-  unsigned char *cells = NULL, *back_cells = NULL;
   (void) argc;
   (void) argv;
 
@@ -63,13 +87,23 @@ main (int argc, char *argv[])
   int height = HEIGHT, realheight = HEIGHT;
   int lpad = 0, tpad = 0;
 
+  if ((width - 1) / CELL_SIZE > MAX_GRID_SIZE)
+    width = MAX_GRID_SIZE * CELL_SIZE + 1;
+
+  if ((height - 1) / CELL_SIZE > MAX_GRID_SIZE)
+    height = MAX_GRID_SIZE * CELL_SIZE + 1;
+
+  set_padding (realwidth, realheight, width, height, &lpad, &tpad);
+
   int cw = (width - 1) / CELL_SIZE, ch = (height - 1) / CELL_SIZE;
   int resize_pending = 0, is_playing = 0;
   Uint64 resize_ticks = SDL_GetTicks (), game_ticks = SDL_GetTicks (),
          frame_ticks;
 
-  cells      = malloc (cw * ch);
-  back_cells = malloc (cw * ch);
+  size_t num_max_cells = MAX_GRID_SIZE * MAX_GRID_SIZE;
+
+  cells      = malloc (num_max_cells);
+  back_cells = malloc (num_max_cells);
 
   if (!cells || !back_cells)
     {
@@ -77,7 +111,8 @@ main (int argc, char *argv[])
       goto fail;
     }
 
-  memset (cells, 0, cw * ch);
+  memset (cells, 0, num_max_cells);
+  memset (back_cells, 0, num_max_cells);
 
   while (1)
     {
@@ -115,8 +150,6 @@ main (int argc, char *argv[])
             }
           else if (event.type == SDL_EVENT_WINDOW_RESIZED)
             {
-              int tmpcw = cw, tmpch = ch;
-
               realwidth  = event.window.data1;
               realheight = event.window.data2;
 
@@ -124,7 +157,20 @@ main (int argc, char *argv[])
               height = (realheight - 1) / CELL_SIZE * CELL_SIZE + 1;
 
               cw = (width - 1) / CELL_SIZE;
+
+              if (cw > MAX_GRID_SIZE)
+                {
+                  cw    = MAX_GRID_SIZE;
+                  width = cw * CELL_SIZE + 1;
+                }
+
               ch = (height - 1) / CELL_SIZE;
+
+              if (ch > MAX_GRID_SIZE)
+                {
+                  ch     = MAX_GRID_SIZE;
+                  height = ch * CELL_SIZE + 1;
+                }
 
               if (realwidth > width)
                 lpad = (realwidth - width - 1) / 2;
@@ -135,27 +181,6 @@ main (int argc, char *argv[])
                 tpad = (realheight - height - 1) / 2;
               else
                 tpad = 0;
-
-              if (tmpcw != cw || tmpch != ch)
-                {
-                  unsigned char *tmpcells     = malloc (cw * ch);
-                  unsigned char *tmpbackcells = malloc (cw * ch);
-
-                  if (!tmpcells || !tmpbackcells)
-                    {
-                      eprintln ("out of memory");
-                      goto fail;
-                    }
-
-                  memset (tmpcells, 0, cw * ch);
-                  memset (tmpbackcells, 0, cw * ch);
-
-                  free (cells);
-                  free (back_cells);
-
-                  cells      = tmpcells;
-                  back_cells = tmpbackcells;
-                }
 
               int tmpwidth
                   = (realwidth + CELL_SIZE - 2) / CELL_SIZE * CELL_SIZE + 1;
@@ -276,22 +301,10 @@ main (int argc, char *argv[])
     }
 
 stop:
-  if (cells)
-    free (cells);
-
-  if (back_cells)
-    free (back_cells);
-
-  sdl_cleanup ();
+  cleanup ();
   return 0;
 
 fail:
-  if (cells)
-    free (cells);
-
-  if (back_cells)
-    free (back_cells);
-
-  sdl_cleanup ();
+  cleanup ();
   return -1;
 }
