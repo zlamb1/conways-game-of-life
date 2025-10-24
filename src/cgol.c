@@ -172,15 +172,7 @@ main (int argc, char *argv[])
                   height = ch * CELL_SIZE + 1;
                 }
 
-              if (realwidth > width)
-                lpad = (realwidth - width - 1) / 2;
-              else
-                lpad = 0;
-
-              if (realheight > height)
-                tpad = (realheight - height - 1) / 2;
-              else
-                tpad = 0;
+              set_padding (realwidth, realheight, width, height, &lpad, &tpad);
 
               int tmpwidth
                   = (realwidth + CELL_SIZE - 2) / CELL_SIZE * CELL_SIZE + 1;
@@ -249,18 +241,16 @@ main (int argc, char *argv[])
 
                 if (is_live)
                   back_cells[y * cw + x]
-                      = (num_neighbors == 2 || num_neighbors == 3);
-                else if (num_neighbors == 3)
-                  back_cells[y * cw + x] = 1;
+                      = num_neighbors == 2 || num_neighbors == 3;
+                else
+                  back_cells[y * cw + x] = num_neighbors == 3;
               }
 
           // we operate on a back buffer of the cells so as to not impede
           // calculations each simulation period
           unsigned char *tmpcells = cells;
-          memset (tmpcells, 0, cw * ch);
-
-          cells      = back_cells;
-          back_cells = tmpcells;
+          cells                   = back_cells;
+          back_cells              = tmpcells;
         }
 
       SDL_SetRenderDrawColor (renderer, 0, 0, 0, 255);
