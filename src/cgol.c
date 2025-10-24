@@ -1,4 +1,3 @@
-#include <SDL3/SDL_oldnames.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
